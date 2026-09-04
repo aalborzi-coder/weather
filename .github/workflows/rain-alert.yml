@@ -1,0 +1,44 @@
+name: Rain alert
+
+on:
+  schedule:
+    # GitHub cron is always UTC, so both times are listed and the script
+    # ignores whichever one isn't 6:30 AM locally today.
+    - cron: "30 10 * * *" # 6:30 AM Eastern Daylight Time
+    - cron: "30 11 * * *" # 6:30 AM Eastern Standard Time
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the email instead of sending it"
+        type: boolean
+        default: false
+
+jobs:
+  check-rain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the forecast, email only if rain is likely
+        env:
+          # --- edit these ---
+          RAIN_LAT: "40.4433" # CMU campus
+          RAIN_LON: "-79.9436"
+          RAIN_TZ: "America/New_York"
+          RAIN_LOCATION_NAME: "Pittsburgh"
+          RAIN_PROB_THRESHOLD: "40" # an hour counts as rainy at 40%+ chance
+          RAIN_SEND_HOUR: "6" # local hour the email should land
+
+          # --- from repository secrets, don't edit ---
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+
+          # Manual runs skip the time check so you can test at any hour.
+          RAIN_FORCE_SEND: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          RAIN_DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: python rain_alert.py
